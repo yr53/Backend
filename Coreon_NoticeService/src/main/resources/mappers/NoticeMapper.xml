@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+
+
+<mapper namespace="com.coreon.notice.mapper.NoticeMapper">
+
+    <select id="selectNoticeList" resultType="com.coreon.notice.dto.ListDTO">
+        SELECT
+            notice_id      AS noticeId,
+            category       AS category,
+            title          AS title,
+            publisher_dept AS publisherDept,
+            created_at     AS createdAt
+        FROM notice
+        <where>
+            <if test="category != null and category != ''">
+                category = #{category}
+            </if>
+
+            <if test="query != null and query != ''">
+                <if test="category != null and category != ''">
+                    AND
+                </if>
+                (title LIKE CONCAT('%', #{query}, '%')
+                 OR content LIKE CONCAT('%', #{query}, '%'))
+            </if>
+        </where>
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectNoticeDetail" resultType="com.coreon.notice.dto.NoticeDetailResponse">
+        SELECT
+            notice_id      AS noticeId,
+            category       AS category,
+            title          AS title,
+            content        AS content,
+            publisher_dept AS publisherDept,
+            created_by     AS createdBy,
+            created_at     AS createdAt,
+            updated_at     AS updatedAt
+        FROM notice
+        WHERE notice_id = #{noticeId}
+    </select>
+
+   <insert id="insertNotice"
+        useGeneratedKeys="true"
+        keyProperty="req.noticeId"
+        keyColumn="notice_id">
+    INSERT INTO notice (
+        category,
+        title,
+        content,
+        publisher_dept,
+        created_by
+    ) VALUES (
+        #{req.category},
+        #{req.title},
+        #{req.content},
+        #{req.publisherDept},
+        #{actorId}
+    )
+</insert>
+
+
+    <update id="updateNotice">
+        UPDATE notice
+        SET
+            category = #{req.category},
+            title = #{req.title},
+            content = #{req.content},
+            publisher_dept = #{req.publisherDept}
+        WHERE notice_id = #{noticeId}
+    </update>
+
+    <delete id="deleteNotice">
+        DELETE FROM notice
+        WHERE notice_id = #{noticeId}
+    </delete>
+    
+     <select id="existsNotice" parameterType="long" resultType="int">
+    SELECT EXISTS(
+      SELECT 1 FROM notice WHERE notice_id = #{noticeId}
+    )
+  </select>
+
+</mapper>

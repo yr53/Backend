@@ -1,0 +1,84 @@
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.coreon.faq.mapper.FaqMapper">
+
+  <!-- 임베딩 없는 FAQ 조회 -->
+  <select id="selectForEmbedding" resultType="com.coreon.faq.domain.Faq">
+    SELECT
+      id,
+      category,
+      question_title AS questionTitle,
+      answer,
+      CAST(tags_json AS CHAR) AS tagsJson,
+      owner_team AS ownerTeam,
+      is_active AS isActive,
+      embedding_json AS embeddingJson
+    FROM faq
+    WHERE is_active = 1
+      AND (embedding_json IS NULL OR embedding_json = '')
+    ORDER BY id ASC
+    LIMIT #{limit}
+  </select>
+
+  <select id="countEmbedded" resultType="int">
+    SELECT COUNT(*)
+    FROM faq
+    WHERE embedding_json IS NOT NULL AND embedding_json != ''
+  </select>
+
+  <select id="countUnembedded" resultType="int">
+    SELECT COUNT(*)
+    FROM faq
+    WHERE embedding_json IS NULL OR embedding_json = ''
+  </select>
+
+  <!-- 임베딩 업데이트  -->
+  <update id="updateFaqEmbedding">
+    UPDATE faq
+    SET
+      embedding_json = #{embeddingJson},
+      embedding_model = #{embeddingModel},
+      embedded_at = #{embeddedAt}
+    WHERE id = #{id}
+  </update>
+  
+  <!-- 임베딩 가져 오기 -->
+  <select id="selectActiveWithEmbedding" resultType="com.coreon.faq.domain.Faq">
+  SELECT
+    id,
+    category,
+    question_title AS questionTitle,
+    answer,
+    CAST(tags_json AS CHAR) AS tagsJson,
+    owner_team AS ownerTeam,
+    is_active AS isActive,
+    embedding_json AS embeddingJson,
+    embedding_model AS embeddingModel,
+    embedded_at AS embeddedAt
+  FROM faq
+  WHERE is_active = 1
+    AND embedding_json IS NOT NULL
+    AND embedding_json != ''
+  ORDER BY id ASC
+</select>
+
+<!-- db에 있는 내용 그대로 선택 -->
+
+<select id="selectByExactQuestionTitle" resultType="com.coreon.faq.domain.Faq">
+  SELECT
+    id,
+    category,
+    question_title AS questionTitle,
+    answer,
+    CAST(tags_json AS CHAR) AS tagsJson,
+    owner_team AS ownerTeam,
+    is_active AS isActive
+  FROM faq
+  WHERE is_active = 1
+    AND question_title = #{questionTitle}
+  LIMIT 1
+</select>
+
+</mapper>

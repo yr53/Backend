@@ -1,0 +1,27 @@
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.coreon.faq.mapper.FaqChatMapper">
+
+    <insert id="insertMessage">
+        INSERT INTO faq_chat_message (user_id, role, content, faq_id, score)
+        VALUES (#{userId}, #{role}, #{content}, #{faqId}, #{score})
+    </insert>
+
+    <select id="selectRecentByUser" resultType="com.coreon.faq.domain.FaqChatMessage">
+        SELECT
+            id,
+            user_id AS userId,
+            role,
+            content,
+            faq_id AS faqId,
+            score,
+            created_at AS createdAt
+        FROM faq_chat_message
+        WHERE user_id = #{userId}
+        ORDER BY id DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

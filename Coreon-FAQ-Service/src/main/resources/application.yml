@@ -1,0 +1,62 @@
+server:
+  port: ${SERVER_PORT:8083}
+  address: 0.0.0.0
+  servlet:
+    session:
+      cookie:
+        name: SESSION
+        http-only: true
+        secure: ${COOKIE_SECURE:false}
+        same-site: lax
+
+spring:
+  application:
+    name: faq-service
+
+  session:
+    store-type: redis
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  datasource:
+    url: jdbc:mariadb://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:web_db}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:rhdwn}
+    driver-class-name: org.mariadb.jdbc.Driver
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+mybatis:
+  mapper-locations: classpath:/mappers/*.xml
+  type-aliases-package: com.coreon.faq.domain
+
+cloud:
+  aws:
+    credentials:
+      access-key: ${AWS_ACCESS_KEY_ID:}
+      secret-key: ${AWS_SECRET_ACCESS_KEY:}
+    region:
+      static: ${AWS_REGION:ap-northeast-2}
+    stack:
+      auto: false
+    s3:
+      bucket: ${S3_BUCKET:coreon}
+
+openai:
+  api-key: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
+  embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+
+custom:
+  frontend-origin: ${FRONTEND_ORIGIN:http://localhost}
+  s3:
+    prefix: ${S3_PREFIX:board/}
+
+logging:
+  level:
+    com.coreon.faq: INFO

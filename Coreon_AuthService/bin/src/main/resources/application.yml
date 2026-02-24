@@ -1,0 +1,56 @@
+server:
+  port: 8080
+  address: 0.0.0.0
+  servlet:
+    session:
+      cookie:
+        name: SESSION
+        http-only: true
+        secure: false
+        same-site: lax
+
+spring:
+  application:
+    name: auth-service
+
+  session:
+    store-type: redis
+
+  data:
+    redis:
+      host: http://redis.coreon.local
+      port: 6379
+
+
+
+  datasource:
+    url: ${DB_ADDRESS}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.mariadb.jdbc.Driver 
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+mybatis:
+  mapper-locations: classpath:/mappers/*.xml
+  type-aliases-package: com.coreon.auth.dto
+
+cloud:
+  aws:
+    credentials:
+      access-key: ${AWS_ACCESS_KEY_ID}
+      secret-key: ${AWS_SECRET_ACCESS_KEY}
+    region:
+      static: ${AWS_REGION}
+    stack:
+      auto: false
+
+
+# ===========================
+# 🔥 프론트엔드 CORS Origin
+# ===========================
+custom:
+  frontend-origin: ${FRONTEND_ORIGIN:http://10.0.11.129:5500}

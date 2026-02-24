@@ -1,0 +1,19 @@
+# Maven/Gradle build outputs
+**/target/
+**/build/
+
+# Eclipse/STS
+.classpath
+.project
+.settings/
+
+# IntelliJ
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

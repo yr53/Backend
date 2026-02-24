@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+
+
+<mapper namespace="com.coreon.notice.mapper.NoticeAttachmentMapper">
+
+      <insert id="insertAttachment"
+            parameterType="com.coreon.notice.dto.AttachResponseDTO"
+            useGeneratedKeys="true"
+            keyProperty="attachmentId"
+            keyColumn="attachment_id">
+        INSERT INTO notice_attachment
+            (notice_id, originalname, storedurl, content_type, sizebytes)
+        VALUES
+            (#{noticeId}, #{originalName}, #{storedUrl}, #{contentType}, #{sizeBytes})
+    </insert>
+
+
+    <!-- =========================================================
+         2) 첨부 목록 조회
+         GET /api/notice/items/{noticeId}/attachments
+         ========================================================= -->
+    <select id="selectAttachmentsByNoticeId"
+            parameterType="long"
+            resultType="com.coreon.notice.dto.AttachResponseDTO">
+        SELECT
+            attachment_id AS attachmentId,
+            originalname      AS originalName,
+            storedurl     AS storedUrl,
+            content_type   AS contentType,
+            sizebytes      AS sizeBytes,
+            created_at     AS createdAt
+        FROM notice_attachment
+        WHERE notice_id = #{noticeId}
+        ORDER BY attachment_id ASC
+    </select>
+
+
+    <!-- =========================================================
+         3) 첨부 단건 조회 (삭제/다운로드 URL 발급용)
+         GET /api/notice/attachments/{attachmentId}/download
+         DELETE /api/notice/attachments/{attachmentId}
+         ========================================================= -->
+    <select id="selectAttachmentById"
+            parameterType="long"
+            resultType="com.coreon.notice.dto.AttachResponseDTO">
+        SELECT
+            attachment_id AS attachmentId,
+            notice_id     AS noticeId,
+            originalname     AS originalName,
+            storedurl      AS storedUrl,
+            content_type  AS contentType,
+            sizebytes     AS sizeBytes,
+            created_at    AS createdAt
+        FROM notice_attachment
+        WHERE attachment_id = #{attachmentId}
+        LIMIT 1
+    </select>
+
+
+    <!-- =========================================================
+         4) 첨부 삭제
+         ========================================================= -->
+    <delete id="deleteAttachmentById" parameterType="long">
+        DELETE FROM notice_attachment
+        WHERE attachment_id = #{attachmentId}
+    </delete>
+    
+
+    
+
+</mapper>
