@@ -1,0 +1,206 @@
+name: CI+CD - Build/Push and Deploy ONLY Changed Services
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECS_CLUSTER: coreon-intranet-cluster
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-2.amazonaws.com
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # 변경된 "컨테이너(이미지)" 단위로 감지 (ECS.tf의 container name과 1:1 매칭)
+      # ※ front 폴더 경로는 레포 실제 폴더명에 맞게 수정하세요.
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            board:
+              - 'Coreon-Board-Service/**'
+            faq:
+              - 'Coreon-FAQ-Service/**'
+            auth:
+              - 'Coreon_AuthService/**'
+            member:
+              - 'Coreon_MemberService/**'
+            notice:
+              - 'Coreon_NoticeService/**'
+            front:
+              - 'Coreon-Front/**'
+            redis:
+              - 'Coreon-Redis/**'
+
+  build-and-push:
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.detect-changes.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Map app -> folder
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.app }}" in
+            board)  folder="Coreon-Board-Service" ;;
+            faq)    folder="Coreon-FAQ-Service" ;;
+            auth)   folder="Coreon_AuthService" ;;
+            member) folder="Coreon_MemberService" ;;
+            notice) folder="Coreon_NoticeService" ;;
+            front)  folder="Coreon-Front" ;;
+            redis)  folder="Coreon-Redis" ;;
+            *)
+              echo "Unknown app: ${{ matrix.app }}"
+              exit 1
+              ;;
+          esac
+          echo "FOLDER=$folder" >> "$GITHUB_ENV"
+          echo "APP=${{ matrix.app }}" >> "$GITHUB_ENV"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push (only changed image)
+        uses: docker/build-push-action@v6
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        with:
+          context: ./${{ env.FOLDER }}
+          file: ./${{ env.FOLDER }}/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/coreon-${{ env.APP }}:${{ env.IMAGE_TAG }}
+            ${{ env.ECR_REGISTRY }}/coreon-${{ env.APP }}:latest
+
+  deploy:
+    needs: [detect-changes, build-and-push]
+    if: ${{ needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        app: ${{ fromJSON(needs.detect-changes.outputs.matrix) }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Install jq
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq
+
+      - name: Deploy changed container by updating its ECS service taskdef
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP="${{ matrix.app }}"
+          SHA="${{ github.sha }}"
+          IMAGE_URI="${ECR_REGISTRY}/coreon-${APP}:${SHA}"
+
+          # ECS.tf 기준: 컨테이너(APP) -> ECS Service 매핑
+          case "$APP" in
+            front)  SERVICE_NAME="web-service" ;;
+            auth)   SERVICE_NAME="auth-service" ;;
+            member) SERVICE_NAME="auth-service" ;;
+            faq)    SERVICE_NAME="contents-service" ;;
+            board)  SERVICE_NAME="contents-service" ;;
+            notice) SERVICE_NAME="contents-service" ;;
+            redis)  SERVICE_NAME="redis-service" ;;
+            *)
+              echo "ERROR: Unknown APP(container) = $APP"
+              exit 1
+              ;;
+          esac
+
+          CONTAINER_NAME="$APP"
+
+          echo "==> Deploying container=${CONTAINER_NAME} in service=${SERVICE_NAME}"
+          echo "    Image: ${IMAGE_URI}"
+
+          TD_ARN=$(aws ecs describe-services \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${SERVICE_NAME}" \
+            --query "services[0].taskDefinition" \
+            --output text)
+
+          if [[ -z "${TD_ARN}" || "${TD_ARN}" == "None" ]]; then
+            echo "ERROR: Could not resolve taskDefinition for service ${SERVICE_NAME}"
+            exit 1
+          fi
+
+          aws ecs describe-task-definition \
+            --task-definition "${TD_ARN}" \
+            --query "taskDefinition" \
+            --output json > td.json
+
+          jq --arg IMAGE "$IMAGE_URI" --arg CNAME "$CONTAINER_NAME" '
+            del(
+              .taskDefinitionArn,
+              .revision,
+              .status,
+              .requiresAttributes,
+              .compatibilities,
+              .registeredAt,
+              .registeredBy
+            )
+            | .containerDefinitions = (
+                .containerDefinitions
+                | map(if .name == $CNAME then .image = $IMAGE else . end)
+              )
+          ' td.json > td-new.json
+
+          # 검증: 컨테이너명이 실제 taskdef에 존재해야 함
+          if ! jq -e --arg CNAME "$CONTAINER_NAME" \
+            '.containerDefinitions[] | select(.name==$CNAME)' td-new.json >/dev/null; then
+            echo "ERROR: container name '${CONTAINER_NAME}' not found in task definition."
+            echo "Available containers:"
+            jq -r '.containerDefinitions[].name' td-new.json
+            exit 1
+          fi
+
+          NEW_TD_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://td-new.json \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+
+          aws ecs update-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service "${SERVICE_NAME}" \
+            --task-definition "${NEW_TD_ARN}" \
+            --force-new-deployment >/dev/null
+
+          echo "✅ Update triggered: ${SERVICE_NAME} (container=${CONTAINER_NAME})"
