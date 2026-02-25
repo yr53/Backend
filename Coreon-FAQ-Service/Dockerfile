@@ -1,9 +1,10 @@
 # 1단계: Maven 빌드
-FROM maven:3.9.9-eclipse-temurin-17 AS builder
+FROM eclipse-temurin:17-jdk-jammy AS builder
 WORKDIR /build
 
 COPY . .
-RUN mvn -DskipTests clean package
+RUN chmod +x mvnw || true
+RUN ./mvnw clean package -DskipTests
 
 # 2단계: 런타임 이미지
 FROM eclipse-temurin:17-jre-jammy

@@ -18,7 +18,7 @@ spring:
 
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST:redis.coreon.local}
       port: ${REDIS_PORT:6379}
 
 
