@@ -43,15 +43,15 @@ mybatis:
 
 cloud:
   aws:
-    credentials:
-      access-key: 
-      secret-key: 
+    #credentials:
+      #access-key: 
+      #secret-key: 
     region:
       static: ap-northeast-2
     stack:
       auto: false
     s3:
-      bucket: coreon
+      bucket: coreon-board-files 
 
 # ===========================
 # 🔥 프론트엔드 CORS Origin

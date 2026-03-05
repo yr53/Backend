@@ -9,6 +9,10 @@ server:
         secure: ${COOKIE_SECURE:false}
         same-site: lax
 
+app:
+  embedding:
+    batch-on-startup: false   # 기본은 OFF (운영 안전)
+    startup-limit: 200        # 한 번에 임베딩할 최대 개수
 spring:
   application:
     name: faq-service
